@@ -29,73 +29,51 @@ for s = 1 : numel(fl)
         % Open trial table
         trial_table = readtable([PATH_BEHAVIOR, 'S', id, '_eprime.xlsx'], 'ReadVariableNames', true);
 
+        % 'Fixation_RESP_SubTrial_'            no practice trial response during fixation cross    CV   26+2*26+22
+
+        % 'TrialDisplayAonly_RESP'             no practice trial response during auditory presentation    HF
+        % 'TrialDisplay_RESP'                  no practice trial response during visual presentation      GT
+        % 'TrialDisplayAuvi_RESP'              no practice trial response during auvi presentation         HR
+
+
         % Get behavior
         resp_fix = trial_table.Fixation_RESP_SubTrial_;
         resp_a   = trial_table.TrialDisplayAonly_RESP;
         resp_v   = trial_table.TrialDisplay_RESP;
         resp_av  = trial_table.TrialDisplayAuvi_RESP;
 
-        rt_fix = trial_table.Fixation_RT_SubTrial_;
-        rt_a   = trial_table.TrialDisplayAonly_RT;
-        rt_v   = trial_table.TrialDisplay_RT;
-        rt_av  = trial_table.TrialDisplayAuvi_RT;
-
-        counter = 0;
-        behavior = []
         for t = 25 : size(trial_table, 1)
             
-            % Get response
-            resp = 0;
             if iscell(resp_fix)
-                if strcmp(resp_fix{t}, 'm')
-                    resp = 2;
-                elseif strcmp(resp_fix{t}, 'n')
-                    resp = 1;
-                end
+                tmp = resp_fix{t}
+            elseif isnumeric(resp_fix)
+                a = resp_fix(t)
             end
+
             if iscell(resp_a)
-                if strcmp(resp_a{t}, 'm')
-                    resp = 2;
-                elseif strcmp(resp_a{t}, 'n')
-                    resp = 1;
-                end
-
+                a = resp_a{t}
+            elseif isnumeric(resp_a)
+                a = resp_a(t)
             end
+
             if iscell(resp_v)
-                if strcmp(resp_v{t}, 'm')
-                    resp = 2;
-                elseif strcmp(resp_v{t}, 'n')
-                    resp = 1;
-                end
-
+                a = resp_v{t}
+            elseif isnumeric(resp_v)
+                a = resp_v(t)
             end
+
             if iscell(resp_av)
-                if strcmp(resp_av{t}, 'm')
-                    resp = 2;
-                elseif strcmp(resp_av{t}, 'n')
-                    resp = 1;
-                end
+                a = resp_av{t}
+            elseif isnumeric(resp_av)
+                a = resp_av(t)
             end
-
-            rt = NaN;
-            if ~isnan(rt_fix(t)) & rt_fix(t) ~= 0
-                rt = rt_fix(t) + 500;
-
-            elseif ~isnan(rt_a(t)) & rt_a(t) ~= 0
-                rt = rt_a(t);
-
-            elseif ~isnan(rt_v(t)) & rt_v(t) ~= 0
-                rt = rt_v(t);
-
-            elseif ~isnan(rt_av(t)) & rt_av(t) ~= 0
-                rt = rt_av(t);
-            end
-
-            counter = counter + 1;
-            behavior(counter, :) = [resp, rt];
 
         end
-        
+
+
+
+        aa=bb
+    
         % Load dataset
         EEG = pop_loadbv(PATH_RAW_DATA, fl(s).name, [], []);
 
@@ -144,30 +122,6 @@ for s = 1 : numel(fl)
             end
         end
 
-        % Check number of trials
-        if size(EEG.trialinfo, 1) == 648 & size(behavior, 1) == 648
-            for t = 1 : size(EEG.trialinfo, 1)
-
-                % Add response
-                EEG.trialinfo(t, 3) = behavior(t, 1);
-
-                % Add accuracy
-                if EEG.trialinfo(t, 2) == EEG.trialinfo(t, 3)
-                    EEG.trialinfo(t, 4) = 1;
-                elseif EEG.trialinfo(t, 3) == 0
-                    EEG.trialinfo(t, 4) = 2;
-                else
-                    EEG.trialinfo(t, 4) = 0;
-                end
-
-                % Add rt
-                EEG.trialinfo(t, 5) = behavior(t, 2);
-
-            end
-        else
-            error('number of trials seems to be not correct...')
-        end
-
         % Add channel locations
         EEG = pop_chanedit(EEG, 'lookup', channel_location_file);
 
@@ -190,7 +144,7 @@ for s = 1 : numel(fl)
         dataRank = sum(eig(cov(double(EEG.data'))) > 1e-6);
 
         % Epoch data
-        EEG = pop_epoch(EEG, {'stimulus'}, [-0.3, 1], 'newname', [id '_epoched'], 'epochinfo', 'yes');
+        EEG = pop_epoch(EEG, {'stimulus'}, [-0.3, 1], 'newname', [num2str(s) '_epoched'], 'epochinfo', 'yes');
         EEG = pop_rmbase(EEG, [-200, 0]);
 
         % Reject epochs
@@ -206,13 +160,13 @@ for s = 1 : numel(fl)
         EEG.nobrainer = find(EEG.etc.ic_classification.ICLabel.classifications(:, 1) < 0.3 | EEG.etc.ic_classification.ICLabel.classifications(:, 3) > 0.3);
 
         % Save IC set
-        pop_saveset(EEG, 'filename', [id, '_icset.set'], 'filepath', PATH_ICSET, 'check', 'on');
+        pop_saveset(EEG, 'filename', [num2str(s), '_icset.set'], 'filepath', PATH_ICSET, 'check', 'on');
 
         % Remove components
         EEG = pop_subcomp(EEG, EEG.nobrainer, 0);
 
         % Save clean data
-        pop_saveset(EEG, 'filename', [id, '_cleaned.set'], 'filepath', PATH_AUTOCLEANED, 'check', 'on');
+        pop_saveset(EEG, 'filename', [num2str(s), '_cleaned.set'], 'filepath', PATH_AUTOCLEANED, 'check', 'on');
 
 
 end
