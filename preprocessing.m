@@ -4,7 +4,7 @@
 PATH_EEGLAB        = '/home/plkn/eeglab2022.0/';
 PATH_RAW_DATA      = '/mnt/data_fast/rub_seminar_2022/raw_data/';
 PATH_ICSET         = '/mnt/data_fast/rub_seminar_2022/ic_sets/';
-PATH_BEHAVIOR      = '/mnt/data_fast/rub_seminar_2022/behavior/';
+PATH_BEHAVIOR      = '/mnt/data_fast/rub_seminar_2022/eprime_export/';
 PATH_AUTOCLEANED   = '/mnt/data_fast/rub_seminar_2022/autocleaned/';
 
 % Get vhdr file list
@@ -129,7 +129,7 @@ for s = 1 : numel(fl)
                 elseif ismember(condition_number, [2, 5, 8])
                     stimpos = 2;
                 elseif ismember(condition_number, [3, 6, 9])
-                    stimpos = 3;
+                    stimpos = 0;
                 end
 
                 % Get stimulus identity

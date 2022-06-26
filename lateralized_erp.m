@@ -42,7 +42,7 @@ for s = 1 : numel(fl)
     % Iterate conditions
     for cnd = 1 : 3
 
-        % Get indices of left and right targets. Only correct trials
+        % Get indices of left and right targets. Only correct trials.
         target_left  = EEG.trialinfo(:, 2) == 1 & EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 4) == 1;
         target_right = EEG.trialinfo(:, 2) == 2 & EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 4) == 1;
 
@@ -63,11 +63,11 @@ for s = 1 : numel(fl)
         erl_data(s, cnd, chans_right, :) = ((contra_l - ipsi_l) + (contra_r - ipsi_r)) / 2;
 
         % Get behavior
-        n_trials = size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd, :), 1);
-        rt = mean(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 4) == 1, 5));
-        acc = size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 4) == 1, :), 1) / n_trials;
-        incorrect = size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 4) == 0, :), 1) / n_trials;
-        omission = size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 4) == 2, :), 1) / n_trials;
+        n_trials =  size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 2) ~= 0, :), 1);
+        rt =        mean(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 2) ~= 0 & EEG.trialinfo(:, 4) == 1, 5));
+        acc =       size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 2) ~= 0 & EEG.trialinfo(:, 4) == 1, :), 1) / n_trials;
+        incorrect = size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 2) ~= 0 & EEG.trialinfo(:, 4) == 0, :), 1) / n_trials;
+        omission =  size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 2) ~= 0 & EEG.trialinfo(:, 4) == 2, :), 1) / n_trials;
 
         counter = counter + 1;
         behavior(counter, :) = [id, cnd, rt, acc, incorrect, omission];
