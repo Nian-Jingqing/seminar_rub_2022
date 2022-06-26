@@ -29,21 +29,76 @@ for s = 1 : numel(fl)
         % Open trial table
         trial_table = readtable([PATH_BEHAVIOR, 'S', id, '_eprime.xlsx'], 'ReadVariableNames', true);
 
-        % Get behavior
+        % Behavior matrix
+        behavior = [];
+
+        % Condition column
+        conds = trial_table.Condition;
+
+        % Correct response columns
+        cresp_fix = trial_table.Fixation_CRESP_SubTrial_;
+        cresp_a   = trial_table.TrialDisplayAonly_CRESP;
+        cresp_v   = trial_table.TrialDisplay_CRESP;
+        cresp_av  = trial_table.TrialDisplayAuvi_CRESP;
+        
+        % Response columns
         resp_fix = trial_table.Fixation_RESP_SubTrial_;
         resp_a   = trial_table.TrialDisplayAonly_RESP;
         resp_v   = trial_table.TrialDisplay_RESP;
         resp_av  = trial_table.TrialDisplayAuvi_RESP;
 
+        % RT columns
         rt_fix = trial_table.Fixation_RT_SubTrial_;
         rt_a   = trial_table.TrialDisplayAonly_RT;
         rt_v   = trial_table.TrialDisplay_RT;
         rt_av  = trial_table.TrialDisplayAuvi_RT;
 
+        % Iterate non practice block trials
         counter = 0;
-        behavior = []
         for t = 25 : size(trial_table, 1)
-            
+
+            % Get condition
+            if strcmp(conds{t}, 'Auvi')
+                cnd = 1;
+            elseif strcmp(conds{t}, 'Aonly')
+                cnd = 2;
+            elseif strcmp(conds{t}, 'Vonly')
+                cnd = 3;
+            end
+
+            % Get correct response
+            cresp = 0;
+            if iscell(cresp_fix)
+                if strcmp(cresp_fix{t}, 'm')
+                    cresp = 2;
+                elseif strcmp(cresp_fix{t}, 'n')
+                    cresp = 1;
+                end
+            end
+            if iscell(cresp_a)
+                if strcmp(cresp_a{t}, 'm')
+                    cresp = 2;
+                elseif strcmp(cresp_a{t}, 'n')
+                    cresp = 1;
+                end
+
+            end
+            if iscell(cresp_v)
+                if strcmp(cresp_v{t}, 'm')
+                    cresp = 2;
+                elseif strcmp(cresp_v{t}, 'n')
+                    cresp = 1;
+                end
+
+            end
+            if iscell(cresp_av)
+                if strcmp(cresp_av{t}, 'm')
+                    cresp = 2;
+                elseif strcmp(cresp_av{t}, 'n')
+                    cresp = 1;
+                end
+            end
+
             % Get response
             resp = 0;
             if iscell(resp_fix)
@@ -77,6 +132,7 @@ for s = 1 : numel(fl)
                 end
             end
 
+            % Get RT
             rt = NaN;
             if ~isnan(rt_fix(t)) & rt_fix(t) ~= 0
                 rt = rt_fix(t) + 500;
@@ -91,11 +147,21 @@ for s = 1 : numel(fl)
                 rt = rt_av(t);
             end
 
+            % Get accuracy
+            if cresp == resp
+                acc = 1;
+            elseif resp == 0
+                acc = 2;
+            else
+                acc = 0;
+            end
+
+            % Fill matrix
             counter = counter + 1;
-            behavior(counter, :) = [resp, rt];
+            behavior(counter, :) = [cnd, cresp, resp, acc, rt];
 
         end
-        
+
         % Load dataset
         EEG = pop_loadbv(PATH_RAW_DATA, fl(s).name, [], []);
 
@@ -144,26 +210,11 @@ for s = 1 : numel(fl)
             end
         end
 
-        % Check number of trials
+        % Behavior columns: 1=condition | 2=correct response | 3=response | 4=accuracy | 5=rt
+
+        % Check number of trials and add behavioral data to trialinfo
         if size(EEG.trialinfo, 1) == 648 & size(behavior, 1) == 648
-            for t = 1 : size(EEG.trialinfo, 1)
-
-                % Add response
-                EEG.trialinfo(t, 3) = behavior(t, 1);
-
-                % Add accuracy
-                if EEG.trialinfo(t, 2) == EEG.trialinfo(t, 3)
-                    EEG.trialinfo(t, 4) = 1;
-                elseif EEG.trialinfo(t, 3) == 0
-                    EEG.trialinfo(t, 4) = 2;
-                else
-                    EEG.trialinfo(t, 4) = 0;
-                end
-
-                % Add rt
-                EEG.trialinfo(t, 5) = behavior(t, 2);
-
-            end
+            EEG.trialinfo = horzcat(EEG.trialinfo, behavior);
         else
             error('number of trials seems to be not correct...')
         end
