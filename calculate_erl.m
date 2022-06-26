@@ -4,7 +4,7 @@ clear all;
 
 % Path variables
 PATH_EEGLAB        = '/home/plkn/eeglab2022.0/';
-PATH_AUTOCLEANED   = '/mnt/data_fast/rub_seminar_2022/autocleaned/';
+PATH_AUTOCLEANED   = '/mnt/data_fast/rub_seminar_2022/3_autocleaned/';
 
 % Get vhdr file list
 fl = dir([PATH_AUTOCLEANED, '*.set']);
@@ -42,9 +42,20 @@ for s = 1 : numel(fl)
     % Iterate conditions
     for cnd = 1 : 3
 
+
+        % Trialinfo columns:
+        %
+        % 1: condition from EEG (1=AV, 2=A, 3=V)
+        % 2: stimulus side from EEG (1=left, 2=right)
+        % 3: condition from eprime-file (1=AV, 2=A, 3=V)
+        % 4: correct response from eprime-file (1=left, 2=right, 0=none)
+        % 5: observed response from eprime-file (1=left, 2=right, 0=none)
+        % 6: accuracy (1=correct, 2=omission, 0=incorrect)
+        % 7: RT
+
         % Get indices of left and right targets. Only correct trials.
-        target_left  = EEG.trialinfo(:, 2) == 1 & EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 4) == 1;
-        target_right = EEG.trialinfo(:, 2) == 2 & EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 4) == 1;
+        target_left  = EEG.trialinfo(:, 2) == 1 & EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 6) == 1;
+        target_right = EEG.trialinfo(:, 2) == 2 & EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 6) == 1;
 
         % Get ipsi and contra potentials
         ipsi_l   = squeeze(mean(EEG.data(chans_left,  :, target_left), 3));
@@ -62,15 +73,17 @@ for s = 1 : numel(fl)
         erl_data(s, cnd, chans_left,  :) = ((contra_l - ipsi_l) + (contra_r - ipsi_r)) / 2;
         erl_data(s, cnd, chans_right, :) = ((contra_l - ipsi_l) + (contra_r - ipsi_r)) / 2;
 
-        % Get behavior
+        % Get number of trials 
         n_trials =  size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 2) ~= 0, :), 1);
-        rt =        mean(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 2) ~= 0 & EEG.trialinfo(:, 4) == 1, 5));
-        acc =       size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 2) ~= 0 & EEG.trialinfo(:, 4) == 1, :), 1) / n_trials;
-        incorrect = size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 2) ~= 0 & EEG.trialinfo(:, 4) == 0, :), 1) / n_trials;
-        omission =  size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 2) ~= 0 & EEG.trialinfo(:, 4) == 2, :), 1) / n_trials;
+
+        % Get behavioral measures
+        rt =        mean(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 6) == 1 & EEG.trialinfo(:, 2) ~= 0, 7), 1);
+        acc =       size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 6) == 1 & EEG.trialinfo(:, 2) ~= 0, 1), 1);
+        incorrect = size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 6) == 0 & EEG.trialinfo(:, 2) ~= 0, 1), 1);
+        omission =  size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 6) == 2 & EEG.trialinfo(:, 2) ~= 0, 1), 1);
 
         counter = counter + 1;
-        behavior(counter, :) = [id, cnd, rt, acc, incorrect, omission];
+        behavior(counter, :) = [id, cnd, rt, acc, incorrect, omission, n_trials, sum(target_left), sum(target_right)];
 
 
     end
