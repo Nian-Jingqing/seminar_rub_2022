@@ -16,6 +16,7 @@ eeglab;
 
 % Iterate datasets
 b = [];
+c = [];
 counter = 0;
 for s = 1 : numel(fl)
 
@@ -25,7 +26,7 @@ for s = 1 : numel(fl)
 
         % Load coded data
         EEG = pop_loadset('filename', fl(s).name, 'filepath', PATH_CODED_DATA, 'loadmode', 'info');
-
+        aa=bb
         % Double check info
         for t = 1 : size(EEG.trialinfo, 1)
 
@@ -73,7 +74,6 @@ for s = 1 : numel(fl)
             acc1_targ1_perc = sum(co_trial_targ1_idx) / n_trials_targ1;
             acc0_targ1_perc = sum(in_trial_targ1_idx) / n_trials_targ1;
             acc2_targ1_perc = sum(om_trial_targ1_idx) / n_trials_targ1;
-
             rt = mean(EEG.trialinfo(co_trial_targ1_idx, 7));
 
             % Add to table
@@ -96,10 +96,13 @@ for s = 1 : numel(fl)
                              acc2_targ1_perc,...
                              rt,...
                             ];
+
+            c(s, 1) = id;
+            c(s, cnd + 1) = acc1_targ1_perc;
                                       
         end
 
+        % Save matrix
         writematrix(b, [PATH_BEHAVIOR, 'auvi_behavior.csv']);
-
 
 end
