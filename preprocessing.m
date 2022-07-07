@@ -1,4 +1,4 @@
-
+clear all;
 
 % Path variables
 PATH_EEGLAB        = '/home/plkn/eeglab2022.0/';
@@ -18,6 +18,9 @@ eeglab;
 channel_location_file = which('dipplot.m');
 channel_location_file = channel_location_file(1 : end - length('dipplot.m'));
 channel_location_file = [channel_location_file, 'standard_BESA/standard-10-5-cap385.elp'];
+
+% Matrix for preprocesssing statistics
+preprostats = [];
 
 % Iterate datasets
 for s = 1 : numel(fl)
@@ -52,7 +55,6 @@ for s = 1 : numel(fl)
         [EEG, rejected_epochs] = pop_autorej(EEG, 'nogui', 'on');
         EEG.trialinfo(rejected_epochs, :) = [];
 
-
         % Runica & ICLabel
         EEG = pop_runica(EEG, 'extended', 1, 'interrupt', 'on', 'PCA', dataRank);
         EEG = iclabel(EEG);
@@ -69,5 +71,10 @@ for s = 1 : numel(fl)
         % Save clean data
         pop_saveset(EEG, 'filename', [id, '_cleaned.set'], 'filepath', PATH_AUTOCLEANED, 'check', 'on');
 
+        % Save reprocessing statistics in table
+        preprostats(s, :) = [str2num(id), length(EEG.chans_rejected), 648 - EEG.trials, length(EEG.nobrainer)];
 
 end
+
+% Save preprostats
+writematrix(preprostats, [PATH_AUTOCLEANED, 'preprostats.csv']);

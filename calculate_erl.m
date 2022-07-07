@@ -26,6 +26,7 @@ erl_data_contra = zeros(numel(fl), 3, EEG.nbchan, EEG.pnts);
 % Iterate datasets
 behavior = []
 counter = 0;
+id_list = [];
 for s = 1 : numel(fl)
 
     % Load data
@@ -33,6 +34,7 @@ for s = 1 : numel(fl)
 
     % Get id as integer
     id = str2num(fl(s).name(1 : 2));
+    id_list(end + 1) = id;
 
     % Define matching lateralized electrodes
     chans_left   = [1,  2,  6,  7,  8, 11, 12, 16, 19, 20, 24, 25, 29];
@@ -75,60 +77,87 @@ for s = 1 : numel(fl)
 
         % Get number of trials 
         n_trials =  size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 2) ~= 0, :), 1);
+        n_trials_correct =  size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 2) ~= 0 & EEG.trialinfo(:, 6) == 1, :), 1);
 
         % Get behavioral measures
-        rt =        mean(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 6) == 1 & EEG.trialinfo(:, 2) ~= 0, 7), 1);
-        acc =       size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 6) == 1 & EEG.trialinfo(:, 2) ~= 0, 1), 1);
-        incorrect = size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 6) == 0 & EEG.trialinfo(:, 2) ~= 0, 1), 1);
-        omission =  size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 6) == 2 & EEG.trialinfo(:, 2) ~= 0, 1), 1);
+        rt =        nanmean(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 6) == 1 & EEG.trialinfo(:, 2) ~= 0, 7), 1);
+        acc =       size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 6) == 1 & EEG.trialinfo(:, 2) ~= 0, 1), 1) / n_trials;
+        incorrect = size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 6) == 0 & EEG.trialinfo(:, 2) ~= 0, 1), 1) / n_trials;
+        omission =  size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 6) == 2 & EEG.trialinfo(:, 2) ~= 0, 1), 1) / n_trials;
 
         counter = counter + 1;
-        behavior(counter, :) = [id, cnd, rt, acc, incorrect, omission, n_trials, sum(target_left), sum(target_right)];
-
+        behavior(counter, :) = [id, cnd, rt, acc, incorrect, omission, n_trials_correct];
 
     end
 end
 
-mean_behav = [];
-for cnd = 1 : 3
-
-    mean_behav(cnd, :) = mean(behavior(behavior(:, 2) == cnd, :), 1);
-
+% Get subject idx above thresh correct audi-only
+id_to_keep = behavior(behavior(:, 4) > 0.5 & behavior(:, 2) == 2, 1);
+idx_to_keep = [];
+for i = 1 : length(id_to_keep)
+    idx_to_keep(i) = find(id_list == id_to_keep(i))
 end
 
+% Remove sub thresh
+erl_data_ipsi = erl_data_ipsi(idx_to_keep, :, :, :);
+erl_data_contra = erl_data_contra(idx_to_keep, :, :, :);
+erl_data = erl_data(idx_to_keep, :, :, :);
+
+% Get average across subjects for both visual conditions
+gga_v = squeeze(mean(mean(erl_data(:, [1, 3], 24, :), 2), 1));
+
+% Get average across subjects for both auditory conditions
+gga_a = squeeze(mean(mean(erl_data(:, [1, 2], 2, :), 2), 1));
+
+% Get idx of n2pc time window
+[~, idx_n2pc] = min(gga_v);
+time_n2pc = EEG.times(idx_n2pc);
+width_n2pc = 50;
+idx_win_n2pc = EEG.times >= time_n2pc - (width_n2pc / 2) & EEG.times <= time_n2pc + (width_n2pc / 2);
+
+% Get idx of n2ac time window
+[~, idx_n2ac] = min(gga_a);
+time_n2ac = EEG.times(idx_n2ac);
+width_n2ac = 50;
+idx_win_n2ac = EEG.times >= time_n2ac - (width_n2ac / 2) & EEG.times <= time_n2ac + (width_n2ac / 2);
+
+% Plot time window for n2pc analysis
 figure()
-labels = {'rt', 'accuracy', 'incorrect', 'omission'}
-for p = 3 : 6
-    subplot(2, 2, p - 2)
-    plot([1, 2, 3], mean_behav(:, p))
-    title(labels{p - 2})
-end
+subplot(1, 2, 1)
+plot(EEG.times, gga_v)
+xline(time_n2pc - (width_n2pc / 2))
+xline(time_n2pc + (width_n2pc / 2))
+title('n2pc time window in averaged data at po7/8')
+
+subplot(1, 2, 2)
+plot(EEG.times, gga_a)
+xline(time_n2ac - (width_n2ac / 2))
+xline(time_n2ac + (width_n2ac / 2))
+title('n2ac time window in averaged data at fc3/4')
 
 % n2pc
-ipsi_po78_av = squeeze(nanmean(erl_data_ipsi(:, 1, 24, :), 1));
-ipsi_po78_a  = squeeze(nanmean(erl_data_ipsi(:, 2, 24, :), 1));
-ipsi_po78_v  = squeeze(nanmean(erl_data_ipsi(:, 3, 24, :), 1));
-
-contra_po78_av = squeeze(nanmean(erl_data_contra(:, 1, 24, :), 1));
-contra_po78_a  = squeeze(nanmean(erl_data_contra(:, 2, 24, :), 1));
-contra_po78_v  = squeeze(nanmean(erl_data_contra(:, 3, 24, :), 1));
-
-erl_po78_av = squeeze(nanmean(erl_data(:, 1, 24, :), 1));
-erl_po78_a  = squeeze(nanmean(erl_data(:, 2, 24, :), 1));
-erl_po78_v  = squeeze(nanmean(erl_data(:, 3, 24, :), 1));
+idx_chan_v = [24, 25, 23];
+ipsi_po78_av   = squeeze(mean(mean(erl_data_ipsi(:, 1, idx_chan_v, :), 1), 3));
+ipsi_po78_a    = squeeze(mean(mean(erl_data_ipsi(:, 2, idx_chan_v, :), 1), 3));
+ipsi_po78_v    = squeeze(mean(mean(erl_data_ipsi(:, 3, idx_chan_v, :), 1), 3));
+contra_po78_av = squeeze(mean(mean(erl_data_contra(:, 1, idx_chan_v, :), 1), 3));
+contra_po78_a  = squeeze(mean(mean(erl_data_contra(:, 2, idx_chan_v, :), 1), 3));
+contra_po78_v  = squeeze(mean(mean(erl_data_contra(:, 3, idx_chan_v, :), 1), 3));
+erl_po78_av    = squeeze(mean(mean(erl_data(:, 1, idx_chan_v, :), 1), 3));
+erl_po78_a     = squeeze(mean(mean(erl_data(:, 2, idx_chan_v, :), 1), 3));
+erl_po78_v     = squeeze(mean(mean(erl_data(:, 3, idx_chan_v, :), 1), 3));
 
 % n2ac
-ipsi_fc34_av = squeeze(nanmean(erl_data_ipsi(:, 1, 2, :), 1));
-ipsi_fc34_a  = squeeze(nanmean(erl_data_ipsi(:, 2, 2, :), 1));
-ipsi_fc34_v  = squeeze(nanmean(erl_data_ipsi(:, 3, 2, :), 1));
-
-contra_fc34_av = squeeze(nanmean(erl_data_contra(:, 1, 2, :), 1));
-contra_fc34_a  = squeeze(nanmean(erl_data_contra(:, 2, 2, :), 1));
-contra_fc34_v  = squeeze(nanmean(erl_data_contra(:, 3, 2, :), 1));
-
-erl_fc34_av = squeeze(nanmean(erl_data(:, 1, 2, :), 1));
-erl_fc34_a  = squeeze(nanmean(erl_data(:, 2, 2, :), 1));
-erl_fc34_v  = squeeze(nanmean(erl_data(:, 3, 2, :), 1));
+idx_chan_a = [12, 7, 6];
+ipsi_fc34_av   = squeeze(mean(mean(erl_data_ipsi(:, 1, idx_chan_a, :), 1), 3));
+ipsi_fc34_a    = squeeze(mean(mean(erl_data_ipsi(:, 2, idx_chan_a, :), 1), 3));
+ipsi_fc34_v    = squeeze(mean(mean(erl_data_ipsi(:, 3, idx_chan_a, :), 1), 3));
+contra_fc34_av = squeeze(mean(mean(erl_data_contra(:, 1, idx_chan_a, :), 1), 3));
+contra_fc34_a  = squeeze(mean(mean(erl_data_contra(:, 2, idx_chan_a, :), 1), 3));
+contra_fc34_v  = squeeze(mean(mean(erl_data_contra(:, 3, idx_chan_a, :), 1), 3));
+erl_fc34_av    = squeeze(mean(mean(erl_data(:, 1, idx_chan_a, :), 1), 3));
+erl_fc34_a     = squeeze(mean(mean(erl_data(:, 2, idx_chan_a, :), 1), 3));
+erl_fc34_v     = squeeze(mean(mean(erl_data(:, 3, idx_chan_a, :), 1), 3));
 
 % Plot contra versus ipsi and ERLs
 figure()
@@ -166,7 +195,7 @@ plot(EEG.times, erl_po78_a, 'm-', 'LineWidth', 2.5)
 plot(EEG.times, erl_po78_v, 'c-', 'LineWidth', 2.5)
 legend({'av', 'a', 'v'})
 grid on
-ylim([-1.8, 1.5])
+ylim([-2.2, 1.5])
 title('PO7/8 - ERL')
 
 subplot(2, 2, 4)
@@ -176,29 +205,19 @@ plot(EEG.times, erl_fc34_a, 'm-', 'LineWidth', 2.5)
 plot(EEG.times, erl_fc34_v, 'c-', 'LineWidth', 2.5)
 legend({'av', 'a', 'v', '270ms'})
 grid on
-ylim([-1.8, 2.5])
+ylim([-2.2, 2.5])
 title('FC3/4 - ERL')
 
-
-
-
-
-
-
-aa=bb
-
-
-% Topo at 270 ms
-[~, time_idx] = min(abs(EEG.times - 270));
-av270 = squeeze(mean(erl_data(:, 1, :, time_idx), 1));
-a270  = squeeze(mean(erl_data(:, 2, :, time_idx), 1));
-v270  = squeeze(mean(erl_data(:, 3, :, time_idx), 1));
+% Topo n2pc
+av270 = squeeze(mean(mean(erl_data(:, 1, :, idx_win_n2pc), 1), 4));
+a270  = squeeze(mean(mean(erl_data(:, 2, :, idx_win_n2pc), 1), 4));
+v270  = squeeze(mean(mean(erl_data(:, 3, :, idx_win_n2pc), 1), 4));
 
 % Topo at 400 ms
 [~, time_idx] = min(abs(EEG.times - 400));
-av400 = squeeze(mean(erl_data(:, 1, :, time_idx), 1));
-a400  = squeeze(mean(erl_data(:, 2, :, time_idx), 1));
-v400  = squeeze(mean(erl_data(:, 3, :, time_idx), 1));
+av400 = squeeze(mean(mean(erl_data(:, 1, :, idx_win_n2ac), 1), 4));
+a400  = squeeze(mean(mean(erl_data(:, 2, :, idx_win_n2ac), 1), 4));
+v400  = squeeze(mean(mean(erl_data(:, 3, :, idx_win_n2ac), 1), 4));
 
 figure()
 clim = [-1.8, 1.8];
@@ -235,3 +254,6 @@ topoplot(v400, EEG.chanlocs, 'plotrad', 0.7, 'intrad', 0.7, 'intsquare', 'on', '
 colormap('jet');
 caxis(clim);
 title('v - 400ms')
+
+
+

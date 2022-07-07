@@ -1,4 +1,4 @@
-
+clear all;
 
 % Path variables
 PATH_EEGLAB        = '/home/plkn/eeglab2022.0/';
@@ -25,11 +25,20 @@ for s = 1 : numel(fl)
     tmp = regexp(fl(s).name,'\d*','Match');
     id = tmp{1};
 
-    % Open trial table
-    trial_table = readtable([PATH_BEHAVIOR, 'S', id, '_eprime.xlsx'], 'ReadVariableNames', true);
+    %load table
+    fullFileName = [PATH_BEHAVIOR, 'S', id, '_eprime.xlsx'];
+            
+    % Set options for reading table
+    opts = detectImportOptions(fullFileName);
+    opts.VariableNamesRange = 'A2:KW2'; 
+    opts.DataRange = 'A3:KW674';
+    columns = [101 203 215 227 91 193 205 217];
+    for c = 1:length(columns)
+        opts.VariableTypes{columns(c)} = 'double'; 
+    end
 
-    % Behavior matrix
-    behavior = [];
+    % Read table
+    trial_table = readtable(fullFileName, opts, 'ReadVariableNames', true);
 
     % Condition column
     conds = trial_table.Condition;
@@ -39,7 +48,7 @@ for s = 1 : numel(fl)
     cresp_a   = trial_table.TrialDisplayAonly_CRESP;
     cresp_v   = trial_table.TrialDisplay_CRESP;
     cresp_av  = trial_table.TrialDisplayAuvi_CRESP;
-    
+
     % Response columns
     resp_fix = trial_table.Fixation_RESP_SubTrial_;
     resp_a   = trial_table.TrialDisplayAonly_RESP;
@@ -53,6 +62,7 @@ for s = 1 : numel(fl)
     rt_av  = trial_table.TrialDisplayAuvi_RT;
 
     % Iterate non practice block trials
+    behavior = [];
     counter = 0;
     for t = 25 : size(trial_table, 1)
 
@@ -67,83 +77,61 @@ for s = 1 : numel(fl)
 
         % Get correct response
         cresp = 0;
-        if iscell(cresp_fix)
-            if strcmp(cresp_fix{t}, 'm')
-                cresp = 2;
-            elseif strcmp(cresp_fix{t}, 'n')
-                cresp = 1;
-            end
-        end
-        if iscell(cresp_a)
-            if strcmp(cresp_a{t}, 'm')
-                cresp = 2;
-            elseif strcmp(cresp_a{t}, 'n')
-                cresp = 1;
-            end
 
+        if strcmp(cresp_fix(t), 'm')
+            cresp = 2;
+        elseif strcmp(cresp_fix(t), 'n')
+            cresp = 1;
         end
-        if iscell(cresp_v)
-            if strcmp(cresp_v{t}, 'm')
-                cresp = 2;
-            elseif strcmp(cresp_v{t}, 'n')
-                cresp = 1;
-            end
-
+        if strcmp(cresp_a(t), 'm')
+            cresp = 2;
+        elseif strcmp(cresp_a(t), 'n')
+            cresp = 1;
         end
-        if iscell(cresp_av)
-            if strcmp(cresp_av{t}, 'm')
-                cresp = 2;
-            elseif strcmp(cresp_av{t}, 'n')
-                cresp = 1;
-            end
+        if strcmp(cresp_v(t), 'm')
+            cresp = 2;
+        elseif strcmp(cresp_v(t), 'n')
+            cresp = 1;
+        end
+        if strcmp(cresp_av(t), 'm')
+            cresp = 2;
+        elseif strcmp(cresp_av(t), 'n')
+            cresp = 1;
         end
 
         % Get response
         resp = 0;
-        if iscell(resp_fix)
-            if strcmp(resp_fix{t}, 'm')
-                resp = 2;
-            elseif strcmp(resp_fix{t}, 'n')
-                resp = 1;
-            end
+        if strcmp(resp_fix(t), 'm')
+            resp = 2;
+        elseif strcmp(resp_fix(t), 'n')
+            resp = 1;
         end
-        if iscell(resp_a)
-            if strcmp(resp_a{t}, 'm')
-                resp = 2;
-            elseif strcmp(resp_a{t}, 'n')
-                resp = 1;
-            end
-
+        if strcmp(resp_a(t), 'm')
+            resp = 2;
+        elseif strcmp(resp_a(t), 'n')
+            resp = 1;
         end
-        if iscell(resp_v)
-            if strcmp(resp_v{t}, 'm')
-                resp = 2;
-            elseif strcmp(resp_v{t}, 'n')
-                resp = 1;
-            end
-
+        if strcmp(resp_v(t), 'm')
+            resp = 2;
+        elseif strcmp(resp_v(t), 'n')
+            resp = 1;
         end
-        if iscell(resp_av)
-            if strcmp(resp_av{t}, 'm')
-                resp = 2;
-            elseif strcmp(resp_av{t}, 'n')
-                resp = 1;
-            end
+        if strcmp(resp_av(t), 'm')
+            resp = 2;
+        elseif strcmp(resp_av(t), 'n')
+            resp = 1;
         end
 
         % Get RT
         rt = NaN;
-        if ~isnan(rt_fix(t)) & rt_fix(t) ~= 0
-            rt = rt_fix(t) + 500;
-
-        elseif ~isnan(rt_a(t)) & rt_a(t) ~= 0
+        if ~isnan(rt_a(t)) & rt_a(t) ~= 0
             rt = rt_a(t);
-
         elseif ~isnan(rt_v(t)) & rt_v(t) ~= 0
             rt = rt_v(t);
-
         elseif ~isnan(rt_av(t)) & rt_av(t) ~= 0
             rt = rt_av(t);
+        elseif ~isnan(rt_fix(t)) & rt_fix(t) ~= 0
+            rt = rt_fix(t) + 500;
         end
 
         % Get accuracy
