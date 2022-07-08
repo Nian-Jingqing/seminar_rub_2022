@@ -23,10 +23,14 @@ erl_data_ipsi = zeros(numel(fl), 3, EEG.nbchan, EEG.pnts);
 erl_data_contra = zeros(numel(fl), 3, EEG.nbchan, EEG.pnts);
 
 
-% Iterate datasets
+% =============================== COMPUTE THE EVENT_RELATED LATERALIZATIONS ========================================================================
+
+% Some variables...
 behavior = []
 counter = 0;
 id_list = [];
+
+% Iterate datasets
 for s = 1 : numel(fl)
 
     % Load data
@@ -85,23 +89,234 @@ for s = 1 : numel(fl)
         incorrect = size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 6) == 0 & EEG.trialinfo(:, 2) ~= 0, 1), 1) / n_trials;
         omission =  size(EEG.trialinfo(EEG.trialinfo(:, 1) == cnd & EEG.trialinfo(:, 6) == 2 & EEG.trialinfo(:, 2) ~= 0, 1), 1) / n_trials;
 
+        % Collect behavioral measure in a matrix
         counter = counter + 1;
         behavior(counter, :) = [id, cnd, rt, acc, incorrect, omission, n_trials_correct];
 
     end
 end
 
-% Get subject idx above thresh correct audi-only
-id_to_keep = behavior(behavior(:, 4) > 0.5 & behavior(:, 2) == 2, 1);
+% Identify subjects that had an accuracy of at least chance level
+av_to_keep = behavior(behavior(:, 4) > 0.5 & behavior(:, 2) == 1, 1); % Auvi above chance
+v_to_keep  = behavior(behavior(:, 4) > 0.5 & behavior(:, 2) == 3, 1); % Vi only above chance
+id_to_keep = intersect(av_to_keep, v_to_keep);
+
+% Get idx in file-list of those subjects
 idx_to_keep = [];
 for i = 1 : length(id_to_keep)
-    idx_to_keep(i) = find(id_list == id_to_keep(i))
+    idx_to_keep(i) = find(id_list == id_to_keep(i));
 end
 
-% Remove sub thresh
+% Remove sub-threshold performers from eeeg-data
 erl_data_ipsi = erl_data_ipsi(idx_to_keep, :, :, :);
 erl_data_contra = erl_data_contra(idx_to_keep, :, :, :);
 erl_data = erl_data(idx_to_keep, :, :, :);
+
+% Select posterior electrode patch (P7/8, PO7/8, PO3/4)
+idx_chan_v = [19, 24, 25];
+
+% Average across selected electrodes
+erl_posterior_ipsi_av   = squeeze(mean(mean(erl_data_ipsi(:, 1, idx_chan_v, :), 1), 3));
+erl_posterior_ipsi_v    = squeeze(mean(mean(erl_data_ipsi(:, 3, idx_chan_v, :), 1), 3));
+erl_posterior_contra_av = squeeze(mean(mean(erl_data_contra(:, 1, idx_chan_v, :), 1), 3));
+erl_posterior_contra_v  = squeeze(mean(mean(erl_data_contra(:, 3, idx_chan_v, :), 1), 3));
+erl_posterior_diff_av   = squeeze(mean(mean(erl_data(:, 1, idx_chan_v, :), 1), 3));
+erl_posterior_diff_v    = squeeze(mean(mean(erl_data(:, 3, idx_chan_v, :), 1), 3));
+
+% Define time window for topography
+time_win = [230, 280];
+idx_time_win = EEG.times >= time_win(1) & EEG.times <= time_win(2);
+
+% Get values for plotting topography
+[~, time_idx] = min(abs(EEG.times - 400));
+topovals_av = squeeze(mean(mean(erl_data(:, 1, :, idx_time_win), 1), 4));
+topovals_v  = squeeze(mean(mean(erl_data(:, 3, :, idx_time_win), 1), 4));
+
+% Plot frontal asymmetry auvi versus visu
+figure()
+subplot(2, 2, 1)
+plot(EEG.times, erl_posterior_ipsi_av, 'k:', 'LineWidth', 2)
+hold on
+plot(EEG.times, erl_posterior_ipsi_v, 'r:', 'LineWidth', 2)
+plot(EEG.times, erl_posterior_contra_av, 'k-', 'LineWidth', 2)
+plot(EEG.times, erl_posterior_contra_v, 'r-', 'LineWidth', 2)
+legend({'auvi-ipsi', 'visu-ipsi', 'auvi-contra', 'visu-contra'})
+grid on
+ylim([-3.5, 2.5])
+title('contra vs ipsi at [P7/8, PO7/8, PO3/4]')
+
+subplot(2, 2, 2)
+plot(EEG.times, erl_posterior_diff_av, 'k-', 'LineWidth', 2.5)
+hold on
+plot(EEG.times, erl_posterior_diff_v, 'r-', 'LineWidth', 2.5)
+legend({'auvi', 'visu'})
+grid on
+ylim([-2.2, 1.5])
+title('Lateralization at [P7/8, PO7/8, PO3/4]')
+xline(time_win(1))
+xline(time_win(2))
+
+% Color limits for topos
+clim = [-1.8, 1.8];
+
+subplot(2, 2, 3)
+topoplot(topovals_av, EEG.chanlocs, 'plotrad', 0.7, 'intrad', 0.7, 'intsquare', 'on', 'conv', 'off', 'electrodes', 'on');
+colormap('jet');
+caxis(clim);
+title(['Auvi from ', num2str(time_win(1)), ' to ', num2str(time_win(2)), ' ms'])
+colorbar()
+
+subplot(2, 2, 4)
+topoplot(topovals_v, EEG.chanlocs, 'plotrad', 0.7, 'intrad', 0.7, 'intsquare', 'on', 'conv', 'off', 'electrodes', 'on');
+colormap('jet');
+caxis(clim);
+title(['Visu from ', num2str(time_win(1)), ' to ', num2str(time_win(2)), ' ms'])
+colorbar()
+
+% Set some parameters
+pval_cluster = 0.25;
+n_perms = 1000;
+n_subjects = size(erl_data, 1);
+pval_voxel = 0.01;
+
+% Select a time window for analysis
+idx_time_win_analysis = EEG.times >= 0 & EEG.times <= 800;
+
+% Data for statistical analysis as dubects x time
+analysis_times = EEG.times(idx_time_win_analysis);
+data1 = squeeze(mean(erl_data(:, 1, idx_chan_v, idx_time_win_analysis), 3)); % Auvi
+data2 = squeeze(mean(erl_data(:, 3, idx_chan_v, idx_time_win_analysis), 3)); % Visu
+
+% Init matrices
+permuted_t = zeros(n_perms, size(data1, 2));
+max_tsum = zeros(n_perms, 2);
+max_nvox = zeros(n_perms, 1);
+desmat = [zeros(n_subjects, 1), ones(n_subjects, 1)];
+
+% Iterate permutations
+for perm = 1 : n_perms
+
+    % Permute
+    toflip = randsample(n_subjects, floor(n_subjects / 2));
+    d1_perm = data1;
+    d1_perm(toflip, :) = data2(toflip, :);
+    d2_perm = data2;
+    d2_perm(toflip, :) = data1(toflip, :);
+
+    % Calculate and save t values
+    tnum = squeeze(mean(d1_perm - d2_perm, 1));
+    tdenum = squeeze(std(d1_perm - d2_perm, 0, 1)) / sqrt(n_subjects);
+    fake_t = tnum ./ tdenum;
+    permuted_t(perm, :) = fake_t;
+
+    % Threshold t values
+    fake_t(abs(fake_t) < tinv(1 - pval_voxel, n_subjects) - 1) = 0;
+    fake_t = logical(fake_t);
+
+    % Identify clusters
+    [clust_labels, n_clusts] = bwlabel(fake_t);
+
+    % Determine min and mux sum of t in clusters
+    sum_t = [];
+    sum_vox = [];
+    for clu = 1 : n_clusts
+        sum_t(end + 1) = sum(fake_t(clust_labels == clu));
+        sum_vox(end + 1) = sum(clust_labels == clu);
+    end
+
+    % Collect min and max cluster statistics
+    max_tsum(perm, 1) = min([0, sum_t]);
+    max_tsum(perm, 2) = max([0, sum_t]);
+    max_nvox(perm) = max([0, sum_vox]);
+
+end
+
+% T-test the real thing
+tnum = squeeze(mean(data1 - data2, 1));
+tdenum = squeeze(std(data1 - data2, 0, 1)) / sqrt(size(data1, 1));
+tmat = tnum ./ tdenum;
+
+% Save for later before thresholding
+tvals = tmat;
+
+% Threshold t values
+tmat(abs(tmat) < tinv(1 - pval_voxel, size(data1, 1) - 1)) = 0;
+tmat = logical(tmat);
+
+% Identify clusters
+[clust_labels, n_clusts] = bwlabel(tmat);
+
+% Determine min and mux sum of t in clusters
+sum_t = [];
+sum_vox = [];
+for clu = 1 : n_clusts
+    sum_t(end + 1) = sum(fake_t(clust_labels == clu));
+    sum_vox(end + 1) = sum(clust_labels == clu);
+end
+
+% Determine upper and lower thresholds
+clust_thresh_lower = prctile(max_tsum(:, 1), pval_cluster * 100);
+clust_thresh_upper = prctile(max_tsum(:, 2), 100 - pval_cluster * 100);
+clust_thresh_nvox  = prctile(max_nvox, 100 - pval_cluster * 100);
+
+% Determine cluster to keep
+clust2keep = find(sum_t <= clust_thresh_lower | sum_t >= clust_thresh_upper);
+%clust2keep = find(sum_vox >= clust_thresh_nvox);
+
+% Build cluster vector
+clust_vector = zeros(size(tmat));
+for clu = 1 : length(clust2keep)
+    clust_vector(clust_labels == clust2keep(clu)) = 1;
+end
+
+% Set the flag of significance
+sig_flag = logical(sum(clust_vector(:)));
+
+% Calculate effect sizes
+x = tvals.^2 ./ (tvals.^2 + (n_subjects - 1));
+apes = x - (1 - x) .* (1 / (n_subjects - 1));
+
+% Calculate averages
+mean_data1 = squeeze(mean(data1, 1));
+mean_data2 = squeeze(mean(data2, 1));
+
+
+figure()
+plot(analysis_times, mean_data1)
+hold on
+plot(analysis_times, mean_data2)
+plot(analysis_times, tvals)
+plot(analysis_times, apes)
+plot(analysis_times, tmat)
+plot(analysis_times, clust_vector)
+legend('erl-av', 'erl-v', 't-vals', 'eta', 'cluster-thresh', 'cluster')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+aa=bb
+
+
+
+
+
+
+
+
+
+
 
 % Get average across subjects for both visual conditions
 gga_v = squeeze(mean(mean(erl_data(:, [1, 3], 24, :), 2), 1));
@@ -135,17 +350,7 @@ xline(time_n2ac - (width_n2ac / 2))
 xline(time_n2ac + (width_n2ac / 2))
 title('n2ac time window in averaged data at fc3/4')
 
-% n2pc
-idx_chan_v = [24, 25, 23];
-ipsi_po78_av   = squeeze(mean(mean(erl_data_ipsi(:, 1, idx_chan_v, :), 1), 3));
-ipsi_po78_a    = squeeze(mean(mean(erl_data_ipsi(:, 2, idx_chan_v, :), 1), 3));
-ipsi_po78_v    = squeeze(mean(mean(erl_data_ipsi(:, 3, idx_chan_v, :), 1), 3));
-contra_po78_av = squeeze(mean(mean(erl_data_contra(:, 1, idx_chan_v, :), 1), 3));
-contra_po78_a  = squeeze(mean(mean(erl_data_contra(:, 2, idx_chan_v, :), 1), 3));
-contra_po78_v  = squeeze(mean(mean(erl_data_contra(:, 3, idx_chan_v, :), 1), 3));
-erl_po78_av    = squeeze(mean(mean(erl_data(:, 1, idx_chan_v, :), 1), 3));
-erl_po78_a     = squeeze(mean(mean(erl_data(:, 2, idx_chan_v, :), 1), 3));
-erl_po78_v     = squeeze(mean(mean(erl_data(:, 3, idx_chan_v, :), 1), 3));
+
 
 % n2ac
 idx_chan_a = [12, 7, 6];
@@ -159,34 +364,7 @@ erl_fc34_av    = squeeze(mean(mean(erl_data(:, 1, idx_chan_a, :), 1), 3));
 erl_fc34_a     = squeeze(mean(mean(erl_data(:, 2, idx_chan_a, :), 1), 3));
 erl_fc34_v     = squeeze(mean(mean(erl_data(:, 3, idx_chan_a, :), 1), 3));
 
-% Plot contra versus ipsi and ERLs
-figure()
-subplot(2, 2, 1)
-plot(EEG.times, ipsi_po78_av, 'k-', 'LineWidth', 2)
-hold on
-plot(EEG.times, ipsi_po78_a, 'm-', 'LineWidth', 2)
-plot(EEG.times, ipsi_po78_v, 'c-', 'LineWidth', 2)
-plot(EEG.times, contra_po78_av, 'k:', 'LineWidth', 2)
-plot(EEG.times, contra_po78_a, 'm:', 'LineWidth', 2)
-plot(EEG.times, contra_po78_v, 'c:', 'LineWidth', 2)
-legend({'av-ipsi', 'a-ipsi', 'v-ipsi', 'av-contra', 'a-contra', 'v-contra'})
-grid on
-ylim([-3.5, 2.5])
-title('PO7/8 - contra vs ipsi')
 
-
-subplot(2, 2, 2)
-plot(EEG.times, ipsi_fc34_av, 'k-', 'LineWidth', 2)
-hold on
-plot(EEG.times, ipsi_fc34_a, 'm-', 'LineWidth', 2)
-plot(EEG.times, ipsi_fc34_v, 'c-', 'LineWidth', 2)
-plot(EEG.times, contra_fc34_av, 'k:', 'LineWidth', 2)
-plot(EEG.times, contra_fc34_a, 'm:', 'LineWidth', 2)
-plot(EEG.times, contra_fc34_v, 'c:', 'LineWidth', 2)
-legend({'av-ipsi', 'a-ipsi', 'v-ipsi', 'av-contra', 'a-contra', 'v-contra'})
-grid on
-ylim([-3.5, 2.5])
-title('FC3/4 - contra vs ipsi')
 
 subplot(2, 2, 3)
 plot(EEG.times, erl_po78_av, 'k-', 'LineWidth', 2.5)
@@ -220,6 +398,8 @@ a400  = squeeze(mean(mean(erl_data(:, 2, :, idx_win_n2ac), 1), 4));
 v400  = squeeze(mean(mean(erl_data(:, 3, :, idx_win_n2ac), 1), 4));
 
 figure()
+
+
 clim = [-1.8, 1.8];
 subplot(2, 3, 1)
 topoplot(av270, EEG.chanlocs, 'plotrad', 0.7, 'intrad', 0.7, 'intsquare', 'on', 'conv', 'off', 'electrodes', 'on');
