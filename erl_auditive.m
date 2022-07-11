@@ -230,7 +230,7 @@ apes = x - (1 - x) .* (1 / (n_subjects - 1));
 mean_data1 = squeeze(mean(data1, 1));
 mean_data2 = squeeze(mean(data2, 1));
 
-% Plot frontal asymmetry auvi versus visu
+% Plot frontal asymmetry auvi versus audi
 figure()
 subplot(2, 2, 1)
 plot(EEG.times, erl_frontal_ipsi_av, 'k:', 'LineWidth', 2)
@@ -238,7 +238,7 @@ hold on
 plot(EEG.times, erl_frontal_ipsi_a, 'r:', 'LineWidth', 2)
 plot(EEG.times, erl_frontal_contra_av, 'k-', 'LineWidth', 2)
 plot(EEG.times, erl_frontal_contra_a, 'r-', 'LineWidth', 2)
-legend({'auvi-ipsi', 'visu-ipsi', 'auvi-contra', 'visu-contra'})
+legend({'auvi-ipsi', 'audi-ipsi', 'auvi-contra', 'audi-contra'})
 grid on
 ylim([-3.5, 2.5])
 title('contra vs ipsi at [C3/4, FC3/4, FT7/8]')
@@ -254,7 +254,7 @@ plot(EEG.times, mean_data1, 'k', 'LineWidth', 2.5)
 hold on
 plot(EEG.times, mean_data2, 'r', 'LineWidth', 2.5)
 plot(EEG.times, apes, 'g', 'LineWidth', 2)
-legend({'auvi', 'visu', 'effect size'})
+legend({'auvi', 'audi', 'effect size'})
 grid on
 ylim(y_limits)
 title('Lateralization at [C3/4, FC3/4, FT7/8]')
@@ -278,7 +278,7 @@ subplot(2, 2, 4)
 topoplot(topovals_v, EEG.chanlocs, 'plotrad', 0.7, 'intrad', 0.7, 'intsquare', 'on', 'conv', 'off', 'electrodes', 'on');
 colormap('jet');
 caxis(clim);
-title(['Visu from ', num2str(clutimes(1)), ' to ', num2str(clutimes(end)), ' ms'])
+title(['Audi from ', num2str(clutimes(1)), ' to ', num2str(clutimes(end)), ' ms'])
 colorbar()
 
 
