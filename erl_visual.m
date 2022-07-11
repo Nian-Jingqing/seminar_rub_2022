@@ -16,6 +16,7 @@ eeglab;
 % Load info
 EEG = pop_loadset('filename', fl(1).name, 'filepath', PATH_AUTOCLEANED, 'loadmode', 'info');
 
+% Prune data in time
 idx_prune = EEG.times >= -200 & EEG.times <= 800;
 
 % An erl matrix
@@ -229,28 +230,6 @@ apes = x - (1 - x) .* (1 / (n_subjects - 1));
 mean_data1 = squeeze(mean(data1, 1));
 mean_data2 = squeeze(mean(data2, 1));
 
-% Define time window for topography
-time_win = [230, 280];
-idx_time_win = EEG.times >= time_win(1) & EEG.times <= time_win(2);
-
-% Get values for plotting topography
-[~, time_idx] = min(abs(EEG.times - 400));
-topovals_av = squeeze(mean(mean(erl_data(:, 1, :, idx_time_win), 1), 4));
-topovals_v  = squeeze(mean(mean(erl_data(:, 3, :, idx_time_win), 1), 4));
-
-
-figure()
-plot(EEG.times, mean_data1)
-hold on
-plot(EEG.times, mean_data2)
-plot(EEG.times, tvals)
-plot(EEG.times, apes)
-plot(EEG.times, tmat)
-plot(EEG.times, clust_vector)
-legend('erl-av', 'erl-v', 't-vals', 'eta', 'cluster-thresh', 'cluster')
-
-
-
 % Plot frontal asymmetry auvi versus visu
 figure()
 subplot(2, 2, 1)
@@ -280,23 +259,26 @@ grid on
 ylim(y_limits)
 title('Lateralization at [P7/8, PO7/8, PO3/4]')
 
-
+% Define time window for topography
+topovals_av = squeeze(mean(mean(erl_data(:, 1, :, clust_labels == clust2keep(clu)), 1), 4));
+topovals_v  = squeeze(mean(mean(erl_data(:, 3, :, clust_labels == clust2keep(clu)), 1), 4));
 
 % Color limits for topos
 clim = [-1.8, 1.8];
 
+% Plot topographies for conditions
 subplot(2, 2, 3)
 topoplot(topovals_av, EEG.chanlocs, 'plotrad', 0.7, 'intrad', 0.7, 'intsquare', 'on', 'conv', 'off', 'electrodes', 'on');
 colormap('jet');
 caxis(clim);
-title(['Auvi from ', num2str(time_win(1)), ' to ', num2str(time_win(2)), ' ms'])
+title(['Auvi from ', num2str(clutimes(1)), ' to ', num2str(clutimes(end)), ' ms'])
 colorbar()
 
 subplot(2, 2, 4)
 topoplot(topovals_v, EEG.chanlocs, 'plotrad', 0.7, 'intrad', 0.7, 'intsquare', 'on', 'conv', 'off', 'electrodes', 'on');
 colormap('jet');
 caxis(clim);
-title(['Visu from ', num2str(time_win(1)), ' to ', num2str(time_win(2)), ' ms'])
+title(['Visu from ', num2str(clutimes(1)), ' to ', num2str(clutimes(end)), ' ms'])
 colorbar()
 
 
@@ -307,147 +289,6 @@ colorbar()
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-aa=bb
-
-
-
-
-
-
-
-
-
-
-
-% Get average across subjects for both visual conditions
-gga_v = squeeze(mean(mean(erl_data(:, [1, 3], 24, :), 2), 1));
-
-% Get average across subjects for both auditory conditions
-gga_a = squeeze(mean(mean(erl_data(:, [1, 2], 2, :), 2), 1));
-
-% Get idx of n2pc time window
-[~, idx_n2pc] = min(gga_v);
-time_n2pc = EEG.times(idx_n2pc);
-width_n2pc = 50;
-idx_win_n2pc = EEG.times >= time_n2pc - (width_n2pc / 2) & EEG.times <= time_n2pc + (width_n2pc / 2);
-
-% Get idx of n2ac time window
-[~, idx_n2ac] = min(gga_a);
-time_n2ac = EEG.times(idx_n2ac);
-width_n2ac = 50;
-idx_win_n2ac = EEG.times >= time_n2ac - (width_n2ac / 2) & EEG.times <= time_n2ac + (width_n2ac / 2);
-
-% Plot time window for n2pc analysis
-figure()
-subplot(1, 2, 1)
-plot(EEG.times, gga_v)
-xline(time_n2pc - (width_n2pc / 2))
-xline(time_n2pc + (width_n2pc / 2))
-title('n2pc time window in averaged data at po7/8')
-
-subplot(1, 2, 2)
-plot(EEG.times, gga_a)
-xline(time_n2ac - (width_n2ac / 2))
-xline(time_n2ac + (width_n2ac / 2))
-title('n2ac time window in averaged data at fc3/4')
-
-
-
-% n2ac
-idx_chan_a = [12, 7, 6];
-ipsi_fc34_av   = squeeze(mean(mean(erl_data_ipsi(:, 1, idx_chan_a, :), 1), 3));
-ipsi_fc34_a    = squeeze(mean(mean(erl_data_ipsi(:, 2, idx_chan_a, :), 1), 3));
-ipsi_fc34_v    = squeeze(mean(mean(erl_data_ipsi(:, 3, idx_chan_a, :), 1), 3));
-contra_fc34_av = squeeze(mean(mean(erl_data_contra(:, 1, idx_chan_a, :), 1), 3));
-contra_fc34_a  = squeeze(mean(mean(erl_data_contra(:, 2, idx_chan_a, :), 1), 3));
-contra_fc34_v  = squeeze(mean(mean(erl_data_contra(:, 3, idx_chan_a, :), 1), 3));
-erl_fc34_av    = squeeze(mean(mean(erl_data(:, 1, idx_chan_a, :), 1), 3));
-erl_fc34_a     = squeeze(mean(mean(erl_data(:, 2, idx_chan_a, :), 1), 3));
-erl_fc34_v     = squeeze(mean(mean(erl_data(:, 3, idx_chan_a, :), 1), 3));
-
-
-
-subplot(2, 2, 3)
-plot(EEG.times, erl_po78_av, 'k-', 'LineWidth', 2.5)
-hold on
-plot(EEG.times, erl_po78_a, 'm-', 'LineWidth', 2.5)
-plot(EEG.times, erl_po78_v, 'c-', 'LineWidth', 2.5)
-legend({'av', 'a', 'v'})
-grid on
-ylim([-2.2, 1.5])
-title('PO7/8 - ERL')
-
-subplot(2, 2, 4)
-plot(EEG.times, erl_fc34_av, 'k-', 'LineWidth', 2.5)
-hold on
-plot(EEG.times, erl_fc34_a, 'm-', 'LineWidth', 2.5)
-plot(EEG.times, erl_fc34_v, 'c-', 'LineWidth', 2.5)
-legend({'av', 'a', 'v', '270ms'})
-grid on
-ylim([-2.2, 2.5])
-title('FC3/4 - ERL')
-
-% Topo n2pc
-av270 = squeeze(mean(mean(erl_data(:, 1, :, idx_win_n2pc), 1), 4));
-a270  = squeeze(mean(mean(erl_data(:, 2, :, idx_win_n2pc), 1), 4));
-v270  = squeeze(mean(mean(erl_data(:, 3, :, idx_win_n2pc), 1), 4));
-
-% Topo at 400 ms
-[~, time_idx] = min(abs(EEG.times - 400));
-av400 = squeeze(mean(mean(erl_data(:, 1, :, idx_win_n2ac), 1), 4));
-a400  = squeeze(mean(mean(erl_data(:, 2, :, idx_win_n2ac), 1), 4));
-v400  = squeeze(mean(mean(erl_data(:, 3, :, idx_win_n2ac), 1), 4));
-
-figure()
-
-
-clim = [-1.8, 1.8];
-subplot(2, 3, 1)
-topoplot(av270, EEG.chanlocs, 'plotrad', 0.7, 'intrad', 0.7, 'intsquare', 'on', 'conv', 'off', 'electrodes', 'on');
-colormap('jet');
-caxis(clim);
-title('av - 270ms')
-subplot(2, 3, 2)
-topoplot(a270, EEG.chanlocs, 'plotrad', 0.7, 'intrad', 0.7, 'intsquare', 'on', 'conv', 'off', 'electrodes', 'on');
-colormap('jet');
-caxis(clim);
-title('a - 270ms')
-subplot(2, 3, 3)
-topoplot(v270, EEG.chanlocs, 'plotrad', 0.7, 'intrad', 0.7, 'intsquare', 'on', 'conv', 'off', 'electrodes', 'on');
-colormap('jet');
-caxis(clim);
-title('v - 270ms')
-
-
-clim = [-1, 1];
-subplot(2, 3, 4)
-topoplot(av400, EEG.chanlocs, 'plotrad', 0.7, 'intrad', 0.7, 'intsquare', 'on', 'conv', 'off', 'electrodes', 'on');
-colormap('jet');
-caxis(clim);
-title('av - 400ms')
-subplot(2, 3, 5)
-topoplot(a400, EEG.chanlocs, 'plotrad', 0.7, 'intrad', 0.7, 'intsquare', 'on', 'conv', 'off', 'electrodes', 'on');
-colormap('jet');
-caxis(clim);
-title('a - 400ms')
-subplot(2, 3, 6)
-topoplot(v400, EEG.chanlocs, 'plotrad', 0.7, 'intrad', 0.7, 'intsquare', 'on', 'conv', 'off', 'electrodes', 'on');
-colormap('jet');
-caxis(clim);
-title('v - 400ms')
 
 
 
