@@ -103,7 +103,11 @@ for s = 1 : numel(fl)
                                       
         end
 
-        % Save matrix
+        % Reduce to relevant columns
+        b_redux = b(:, [1, 2, 14, 15, 16, 17]);
+
+        % Save matrices
         writematrix(b, [PATH_BEHAVIOR, 'auvi_behavior.csv']);
+        writematrix(b_redux, [PATH_BEHAVIOR, 'results_behavior.csv']);
 
 end
