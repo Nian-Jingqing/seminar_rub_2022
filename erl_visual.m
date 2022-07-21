@@ -129,7 +129,7 @@ erl_posterior_diff_av   = squeeze(mean(mean(erl_data(:, 1, idx_chan_v, :), 1), 3
 erl_posterior_diff_v    = squeeze(mean(mean(erl_data(:, 3, idx_chan_v, :), 1), 3));
 
 % Set some parameters
-pval_cluster = 0.25;
+pval_cluster = 0.025;
 n_perms = 1000;
 n_subjects = size(erl_data, 1);
 pval_voxel = 0.01;
@@ -161,11 +161,12 @@ for perm = 1 : n_perms
     permuted_t(perm, :) = fake_t;
 
     % Threshold t values
-    fake_t(abs(fake_t) < tinv(1 - pval_voxel, n_subjects) - 1) = 0;
-    fake_t = logical(fake_t);
+    fake_t_binarized = fake_t;
+    fake_t_binarized(abs(fake_t) < tinv(1 - pval_voxel, n_subjects - 1)) = 0;
+    fake_t_binarized = logical(fake_t_binarized);
 
     % Identify clusters
-    [clust_labels, n_clusts] = bwlabel(fake_t);
+    [clust_labels, n_clusts] = bwlabel(fake_t_binarized);
 
     % Determine min and mux sum of t in clusters
     sum_t = [];
