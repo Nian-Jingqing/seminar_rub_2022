@@ -121,12 +121,12 @@ erl_data = erl_data(idx_to_keep, :, :, :);
 idx_chan_v = [19, 24, 25];
 
 % Average across selected electrodes
-erl_posterior_ipsi_av   = squeeze(mean(mean(erl_data_ipsi(:, 1, idx_chan_v, :), 1), 3));
-erl_posterior_ipsi_v    = squeeze(mean(mean(erl_data_ipsi(:, 3, idx_chan_v, :), 1), 3));
-erl_posterior_contra_av = squeeze(mean(mean(erl_data_contra(:, 1, idx_chan_v, :), 1), 3));
-erl_posterior_contra_v  = squeeze(mean(mean(erl_data_contra(:, 3, idx_chan_v, :), 1), 3));
-erl_posterior_diff_av   = squeeze(mean(mean(erl_data(:, 1, idx_chan_v, :), 1), 3));
-erl_posterior_diff_v    = squeeze(mean(mean(erl_data(:, 3, idx_chan_v, :), 1), 3));
+erl_posterior_ipsi_av   = squeeze(mean(erl_data_ipsi(:, 1, idx_chan_v, :), 3));
+erl_posterior_ipsi_v    = squeeze(mean(erl_data_ipsi(:, 3, idx_chan_v, :), 3));
+erl_posterior_contra_av = squeeze(mean(erl_data_contra(:, 1, idx_chan_v, :), 3));
+erl_posterior_contra_v  = squeeze(mean(erl_data_contra(:, 3, idx_chan_v, :), 3));
+erl_posterior_diff_av   = squeeze(mean(erl_data(:, 1, idx_chan_v, :), 3));
+erl_posterior_diff_v    = squeeze(mean(erl_data(:, 3, idx_chan_v, :), 3));
 
 % Set some parameters
 pval_cluster = 0.025;
@@ -134,9 +134,9 @@ n_perms = 1000;
 n_subjects = size(erl_data, 1);
 pval_voxel = 0.01;
 
-% Data for statistical analysis as dubects x time
-data1 = squeeze(mean(erl_data(:, 1, idx_chan_v, :), 3)); % Auvi
-data2 = squeeze(mean(erl_data(:, 3, idx_chan_v, :), 3)); % Visu
+% Test main effect condition (audi-visu versus visu)
+data1 = (erl_posterior_ipsi_av + erl_posterior_contra_av) / 2; % audi-visu
+data2 = (erl_posterior_ipsi_v + erl_posterior_contra_v) / 2;   % visu
 
 % Init matrices
 permuted_t = zeros(n_perms, size(data1, 2));
@@ -234,18 +234,18 @@ mean_data2 = squeeze(mean(data2, 1));
 % Plot frontal asymmetry auvi versus visu
 figure()
 subplot(2, 2, 1)
-plot(EEG.times, erl_posterior_ipsi_av, 'k:', 'LineWidth', 2)
+plot(EEG.times, mean(erl_posterior_ipsi_av, 1), 'k:', 'LineWidth', 2)
 hold on
-plot(EEG.times, erl_posterior_ipsi_v, 'r:', 'LineWidth', 2)
-plot(EEG.times, erl_posterior_contra_av, 'k-', 'LineWidth', 2)
-plot(EEG.times, erl_posterior_contra_v, 'r-', 'LineWidth', 2)
+plot(EEG.times, mean(erl_posterior_ipsi_v, 1), 'r:', 'LineWidth', 2)
+plot(EEG.times, mean(erl_posterior_contra_av, 1), 'k-', 'LineWidth', 2)
+plot(EEG.times, mean(erl_posterior_contra_v, 1), 'r-', 'LineWidth', 2)
 legend({'auvi-ipsi', 'visu-ipsi', 'auvi-contra', 'visu-contra'})
 grid on
 ylim([-3.5, 2.5])
 title('contra vs ipsi at [P7/8, PO7/8, PO3/4]')
 
 subplot(2, 2, 2)
-y_limits = [-2.2, 1.5];
+y_limits = [-3, 2];
 for clu = 1 : length(clust2keep)
     clutimes = EEG.times(clust_labels == clust2keep(clu));
     rectangle('Position',[clutimes(1), y_limits(1), clutimes(end) - clutimes(1), y_limits(2) - y_limits(1)],'FaceColor', '#EDB120', 'EdgeColor', '#EDB120')
@@ -255,14 +255,16 @@ plot(EEG.times, mean_data1, 'k', 'LineWidth', 2.5)
 hold on
 plot(EEG.times, mean_data2, 'r', 'LineWidth', 2.5)
 plot(EEG.times, apes, 'g', 'LineWidth', 2)
-legend({'auvi', 'visu', 'effect size'})
+legend({'audi-visu', 'visu', 'effect size'})
 grid on
 ylim(y_limits)
-title('Lateralization at [P7/8, PO7/8, PO3/4]')
+title('Main effect condition [P7/8, PO7/8, PO3/4]')
 
 % Define time window for topography
-topovals_av = squeeze(mean(mean(erl_data(:, 1, :, clust_labels == clust2keep(clu)), 1), 4));
-topovals_v  = squeeze(mean(mean(erl_data(:, 3, :, clust_labels == clust2keep(clu)), 1), 4));
+topo_times = [180, 220];
+topo_times_idx = EEG.times >= topo_times(1) & EEG.times <= topo_times(2);
+topovals_av = squeeze(mean(mean(erl_data(:, 1, :, topo_times_idx), 1), 4));
+topovals_v  = squeeze(mean(mean(erl_data(:, 3, :, topo_times_idx), 1), 4));
 
 % Color limits for topos
 clim = [-1.8, 1.8];
@@ -272,14 +274,14 @@ subplot(2, 2, 3)
 topoplot(topovals_av, EEG.chanlocs, 'plotrad', 0.7, 'intrad', 0.7, 'intsquare', 'on', 'conv', 'off', 'electrodes', 'on');
 colormap('jet');
 caxis(clim);
-title(['Auvi from ', num2str(clutimes(1)), ' to ', num2str(clutimes(end)), ' ms'])
+title(['Auvi from ', num2str(topo_times(1)), ' to ', num2str(topo_times(end)), ' ms'])
 colorbar()
 
 subplot(2, 2, 4)
 topoplot(topovals_v, EEG.chanlocs, 'plotrad', 0.7, 'intrad', 0.7, 'intsquare', 'on', 'conv', 'off', 'electrodes', 'on');
 colormap('jet');
 caxis(clim);
-title(['Visu from ', num2str(clutimes(1)), ' to ', num2str(clutimes(end)), ' ms'])
+title(['Visu from ', num2str(topo_times(1)), ' to ', num2str(topo_times(end)), ' ms'])
 colorbar()
 
 
