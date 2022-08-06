@@ -4,7 +4,7 @@ clear all;
 
 % Path variables
 PATH_EEGLAB        = '/home/plkn/eeglab2022.0/';
-PATH_AUTOCLEANED   = '/mnt/data_fast/rub_seminar_2022/3_autocleaned/';
+PATH_AUTOCLEANED   = '/mnt/data2/rub_seminar_2022/3_autocleaned/';
 
 % Get vhdr file list
 fl = dir([PATH_AUTOCLEANED, '*.set']);
@@ -52,7 +52,6 @@ for s = 1 : numel(fl)
 
     % Iterate conditions
     for cnd = 1 : 3
-
 
         % Trialinfo columns:
         %
@@ -106,6 +105,9 @@ av_to_keep = behavior(behavior(:, 4) > 0.5 & behavior(:, 2) == 1, 1); % Auvi abo
 v_to_keep  = behavior(behavior(:, 4) > 0.5 & behavior(:, 2) == 3, 1); % Vi only above chance
 id_to_keep = intersect(av_to_keep, v_to_keep);
 
+% Number of subjects
+n_subjects = numel(id_to_keep);
+
 % Get idx in file-list of those subjects
 idx_to_keep = [];
 for i = 1 : length(id_to_keep)
@@ -128,112 +130,9 @@ erl_posterior_contra_v  = squeeze(mean(erl_data_contra(:, 3, idx_chan_v, :), 3))
 erl_posterior_diff_av   = squeeze(mean(erl_data(:, 1, idx_chan_v, :), 3));
 erl_posterior_diff_v    = squeeze(mean(erl_data(:, 3, idx_chan_v, :), 3));
 
-% Set some parameters
-pval_cluster = 0.025;
-n_perms = 1000;
-n_subjects = size(erl_data, 1);
-pval_voxel = 0.01;
-
-% Test main effect condition (audi-visu versus visu)
-data1 = (erl_posterior_ipsi_av + erl_posterior_contra_av) / 2; % audi-visu
-data2 = (erl_posterior_ipsi_v + erl_posterior_contra_v) / 2;   % visu
-
-% Init matrices
-permuted_t = zeros(n_perms, size(data1, 2));
-max_tsum = zeros(n_perms, 2);
-max_nvox = zeros(n_perms, 1);
-desmat = [zeros(n_subjects, 1), ones(n_subjects, 1)];
-
-% Iterate permutations
-for perm = 1 : n_perms
-
-    % Permute
-    toflip = randsample(n_subjects, floor(n_subjects / 2));
-    d1_perm = data1;
-    d1_perm(toflip, :) = data2(toflip, :);
-    d2_perm = data2;
-    d2_perm(toflip, :) = data1(toflip, :);
-
-    % Calculate and save t values
-    tnum = squeeze(mean(d1_perm - d2_perm, 1));
-    tdenum = squeeze(std(d1_perm - d2_perm, 0, 1)) / sqrt(n_subjects);
-    fake_t = tnum ./ tdenum;
-    permuted_t(perm, :) = fake_t;
-
-    % Threshold t values
-    fake_t_binarized = fake_t;
-    fake_t_binarized(abs(fake_t) < tinv(1 - pval_voxel, n_subjects - 1)) = 0;
-    fake_t_binarized = logical(fake_t_binarized);
-
-    % Identify clusters
-    [clust_labels, n_clusts] = bwlabel(fake_t_binarized);
-
-    % Determine min and mux sum of t in clusters
-    sum_t = [];
-    sum_vox = [];
-    for clu = 1 : n_clusts
-        sum_t(end + 1) = sum(fake_t(clust_labels == clu));
-        sum_vox(end + 1) = sum(clust_labels == clu);
-    end
-
-    % Collect min and max cluster statistics
-    max_tsum(perm, 1) = min([0, sum_t]);
-    max_tsum(perm, 2) = max([0, sum_t]);
-    max_nvox(perm) = max([0, sum_vox]);
-
-end
-
-% T-test the real thing
-tnum = squeeze(mean(data1 - data2, 1));
-tdenum = squeeze(std(data1 - data2, 0, 1)) / sqrt(size(data1, 1));
-tmat = tnum ./ tdenum;
-
-% Save for later before thresholding
-tvals = tmat;
-
-% Threshold t values
-tmat(abs(tmat) < tinv(1 - pval_voxel, size(data1, 1) - 1)) = 0;
-tmat = logical(tmat);
-
-% Identify clusters
-[clust_labels, n_clusts] = bwlabel(tmat);
-
-% Determine min and mux sum of t in clusters
-sum_t = [];
-sum_vox = [];
-for clu = 1 : n_clusts
-    sum_t(end + 1) = sum(fake_t(clust_labels == clu));
-    sum_vox(end + 1) = sum(clust_labels == clu);
-end
-
-% Determine upper and lower thresholds
-clust_thresh_lower = prctile(max_tsum(:, 1), pval_cluster * 100);
-clust_thresh_upper = prctile(max_tsum(:, 2), 100 - pval_cluster * 100);
-clust_thresh_nvox  = prctile(max_nvox, 100 - pval_cluster * 100);
-
-% Determine cluster to keep
-clust2keep = find(sum_t <= clust_thresh_lower | sum_t >= clust_thresh_upper);
-
-% Build cluster vector
-clust_vector = zeros(size(tmat));
-for clu = 1 : length(clust2keep)
-    clust_vector(clust_labels == clust2keep(clu)) = 1;
-end
-
-% Set the flag of significance
-sig_flag = logical(sum(clust_vector(:)));
-
-% Calculate effect sizes
-x = tvals.^2 ./ (tvals.^2 + (n_subjects - 1));
-apes = x - (1 - x) .* (1 / (n_subjects - 1));
-
-% Calculate averages
-mean_data1 = squeeze(mean(data1, 1));
-mean_data2 = squeeze(mean(data2, 1));
-
-% Plot frontal asymmetry auvi versus visu
+% Plot ipsi and contra for conditions
 figure()
-subplot(2, 2, 1)
+subplot(3, 2, 1)
 plot(EEG.times, mean(erl_posterior_ipsi_av, 1), 'k:', 'LineWidth', 2)
 hold on
 plot(EEG.times, mean(erl_posterior_ipsi_v, 1), 'r:', 'LineWidth', 2)
@@ -244,7 +143,14 @@ grid on
 ylim([-3.5, 2.5])
 title('contra vs ipsi at [P7/8, PO7/8, PO3/4]')
 
-subplot(2, 2, 2)
+% Test main effect condition
+data1 = (erl_posterior_ipsi_av + erl_posterior_contra_av) / 2;  % audi-visu
+data2 = (erl_posterior_ipsi_v  + erl_posterior_contra_v) / 2;   % visu
+[mean_data1, mean_data2, apes, clust_labels, clust2keep] = clust_perm_test(data1, data2, n_subjects);
+length(clust2keep)
+
+% Plot main effect condition
+subplot(3, 2, 2)
 y_limits = [-3, 2];
 for clu = 1 : length(clust2keep)
     clutimes = EEG.times(clust_labels == clust2keep(clu));
@@ -260,29 +166,210 @@ grid on
 ylim(y_limits)
 title('Main effect condition [P7/8, PO7/8, PO3/4]')
 
-% Define time window for topography
-topo_times = [180, 220];
-topo_times_idx = EEG.times >= topo_times(1) & EEG.times <= topo_times(2);
-topovals_av = squeeze(mean(mean(erl_data(:, 1, :, topo_times_idx), 1), 4));
-topovals_v  = squeeze(mean(mean(erl_data(:, 3, :, topo_times_idx), 1), 4));
+% Test main effect ipsi versus contra
+data1 = (erl_posterior_ipsi_av   + erl_posterior_ipsi_v) / 2;     % ipsi
+data2 = (erl_posterior_contra_av + erl_posterior_contra_v) / 2;   % contra
+[mean_data1, mean_data2, apes, clust_labels, clust2keep] = clust_perm_test(data1, data2, n_subjects);
+length(clust2keep)
+
+% Plot main effect ipsi versus contra
+subplot(3, 2, 3)
+y_limits = [-3, 2];
+for clu = 1 : length(clust2keep)
+    clutimes = EEG.times(clust_labels == clust2keep(clu));
+    rectangle('Position',[clutimes(1), y_limits(1), clutimes(end) - clutimes(1), y_limits(2) - y_limits(1)],'FaceColor', '#EDB120', 'EdgeColor', '#EDB120')
+    hold on
+end
+plot(EEG.times, mean_data1, 'k', 'LineWidth', 2.5)
+hold on
+plot(EEG.times, mean_data2, 'r', 'LineWidth', 2.5)
+plot(EEG.times, apes, 'g', 'LineWidth', 2)
+legend({'ipsi', 'contra', 'effect size'})
+grid on
+ylim(y_limits)
+title('Main effect ipsi versus contra [P7/8, PO7/8, PO3/4]')
+
+% Test interaction
+data1 = erl_posterior_diff_av;  % audi-visu
+data2 = erl_posterior_diff_v;   % visu
+[mean_data1, mean_data2, apes, clust_labels, clust2keep] = clust_perm_test(data1, data2, n_subjects);
+length(clust2keep)
+
+% Plot interaction
+subplot(3, 2, 4)
+y_limits = [-3, 2];
+for clu = 1 : length(clust2keep)
+    clutimes = EEG.times(clust_labels == clust2keep(clu));
+    rectangle('Position',[clutimes(1), y_limits(1), clutimes(end) - clutimes(1), y_limits(2) - y_limits(1)],'FaceColor', '#EDB120', 'EdgeColor', '#EDB120')
+    hold on
+end
+plot(EEG.times, mean_data1, 'k', 'LineWidth', 2.5)
+hold on
+plot(EEG.times, mean_data2, 'r', 'LineWidth', 2.5)
+plot(EEG.times, apes, 'g', 'LineWidth', 2)
+legend({'audi-visu', 'visu', 'effect size'})
+grid on
+ylim(y_limits)
+title('Interaction [P7/8, PO7/8, PO3/4]')
+
+% Get topo values
+lat_times = EEG.times >= 230 & EEG.times <= 270;
+topovals_av = squeeze(mean(mean(erl_data(:, 1, :, lat_times), 1), 4));
+topovals_v  = squeeze(mean(mean(erl_data(:, 3, :, lat_times), 1), 4));
 
 % Color limits for topos
 clim = [-1.8, 1.8];
 
-% Plot topographies for conditions
-subplot(2, 2, 3)
+% Plot lateralization topographies for conditions
+subplot(3, 2, 5)
 topoplot(topovals_av, EEG.chanlocs, 'plotrad', 0.7, 'intrad', 0.7, 'intsquare', 'on', 'conv', 'off', 'electrodes', 'on');
 colormap('jet');
 caxis(clim);
-title(['Auvi from ', num2str(topo_times(1)), ' to ', num2str(topo_times(end)), ' ms'])
+title('Lateralization audi-visu 230-270ms')
 colorbar()
 
-subplot(2, 2, 4)
+subplot(3, 2, 6)
 topoplot(topovals_v, EEG.chanlocs, 'plotrad', 0.7, 'intrad', 0.7, 'intsquare', 'on', 'conv', 'off', 'electrodes', 'on');
 colormap('jet');
 caxis(clim);
-title(['Visu from ', num2str(topo_times(1)), ' to ', num2str(topo_times(end)), ' ms'])
+title('Lateralization visu 230-270ms')
 colorbar()
+
+
+
+
+% Function for statistical testing
+function [mean_data1, mean_data2, apes, clust_labels, clust2keep] = clust_perm_test(data1, data2, n_subjects)
+
+    % Set some parameters
+    pval_cluster = 0.025;
+    n_perms = 10000;
+    pval_voxel = 0.0001;
+
+    % Init matrices
+    permuted_t = zeros(n_perms, size(data1, 2));
+    max_tsum = zeros(n_perms, 2);
+    max_nvox = zeros(n_perms, 1);
+    desmat = [zeros(n_subjects, 1), ones(n_subjects, 1)];
+
+    % Iterate permutations
+    for perm = 1 : n_perms
+
+        % Permute
+        toflip = randsample(n_subjects, floor(n_subjects / 2));
+        d1_perm = data1;
+        d1_perm(toflip, :) = data2(toflip, :);
+        d2_perm = data2;
+        d2_perm(toflip, :) = data1(toflip, :);
+
+        % Calculate and save t values
+        tnum = squeeze(mean(d1_perm - d2_perm, 1));
+        tdenum = squeeze(std(d1_perm - d2_perm, 0, 1)) / sqrt(n_subjects);
+        fake_t = tnum ./ tdenum;
+        permuted_t(perm, :) = fake_t;
+
+        % Threshold t values
+        fake_t_binarized = fake_t;
+        fake_t_binarized(abs(fake_t) < tinv(1 - pval_voxel, n_subjects - 1)) = 0;
+        fake_t_binarized = logical(fake_t_binarized);
+
+        % Identify clusters
+        [clust_labels, n_clusts] = bwlabel(fake_t_binarized);
+
+        % Determine min and mux sum of t in clusters
+        sum_t = [];
+        sum_vox = [];
+        for clu = 1 : n_clusts
+            sum_t(end + 1) = sum(fake_t(clust_labels == clu));
+            sum_vox(end + 1) = sum(clust_labels == clu);
+        end
+
+        % Collect min and max cluster statistics
+        max_tsum(perm, 1) = min([0, sum_t]);
+        max_tsum(perm, 2) = max([0, sum_t]);
+        max_nvox(perm) = max([0, sum_vox]);
+
+    end
+
+    % T-test the real thing
+    tnum = squeeze(mean(data1 - data2, 1));
+    tdenum = squeeze(std(data1 - data2, 0, 1)) / sqrt(size(data1, 1));
+    tmat = tnum ./ tdenum;
+
+    % Save for later before thresholding
+    tvals = tmat;
+
+    % Threshold t values
+    tmat(abs(tmat) < tinv(1 - pval_voxel, size(data1, 1) - 1)) = 0;
+    tmat = logical(tmat);
+
+    % Identify clusters
+    [clust_labels, n_clusts] = bwlabel(tmat);
+
+    % Determine min and mux sum of t in clusters
+    sum_t = [];
+    sum_vox = [];
+    for clu = 1 : n_clusts
+        sum_t(end + 1) = sum(fake_t(clust_labels == clu));
+        sum_vox(end + 1) = sum(clust_labels == clu);
+    end
+
+    % Determine upper and lower thresholds
+    clust_thresh_lower = prctile(max_tsum(:, 1), pval_cluster * 100);
+    clust_thresh_upper = prctile(max_tsum(:, 2), 100 - pval_cluster * 100);
+    clust_thresh_nvox  = prctile(max_nvox, 100 - pval_cluster * 100);
+
+    % Determine cluster to keep
+    clust2keep = find(sum_t <= clust_thresh_lower | sum_t >= clust_thresh_upper);
+
+    % Build cluster vector
+    clust_vector = zeros(size(tmat));
+    for clu = 1 : length(clust2keep)
+        clust_vector(clust_labels == clust2keep(clu)) = 1;
+    end
+
+    % Set the flag of significance
+    sig_flag = logical(sum(clust_vector(:)));
+
+    % Calculate effect sizes
+    x = tvals.^2 ./ (tvals.^2 + (n_subjects - 1));
+    apes = x - (1 - x) .* (1 / (n_subjects - 1));
+
+    % Calculate averages
+    mean_data1 = squeeze(mean(data1, 1));
+    mean_data2 = squeeze(mean(data2, 1));
+
+end
+
+
+
+
+% % Define time window for topography
+% topo_times = [180, 220];
+% topo_times_idx = EEG.times >= topo_times(1) & EEG.times <= topo_times(2);
+% topovals_av = squeeze(mean(mean(erl_data(:, 1, :, topo_times_idx), 1), 4));
+% topovals_v  = squeeze(mean(mean(erl_data(:, 3, :, topo_times_idx), 1), 4));
+
+% % Color limits for topos
+% clim = [-1.8, 1.8];
+
+% % Plot topographies for conditions
+% topoplot(topovals_v, EEG.chanlocs, 'plotrad', 0.7, 'intrad', 0.7, 'intsquare', 'on', 'conv', 'off', 'electrodes', 'on');
+% colormap('jet');
+
+% subplot(2, 2, 3)
+% topoplot(topovals_av, EEG.chanlocs, 'plotrad', 0.7, 'intrad', 0.7, 'intsquare', 'on', 'conv', 'off', 'electrodes', 'on');
+% colormap('jet');
+% caxis(clim);
+% title(['Auvi from ', num2str(topo_times(1)), ' to ', num2str(topo_times(end)), ' ms'])
+% colorbar()
+
+% subplot(2, 2, 4)
+% topoplot(topovals_v, EEG.chanlocs, 'plotrad', 0.7, 'intrad', 0.7, 'intsquare', 'on', 'conv', 'off', 'electrodes', 'on');
+% colormap('jet');
+% caxis(clim);
+% title(['Visu from ', num2str(topo_times(1)), ' to ', num2str(topo_times(end)), ' ms'])
+% colorbar()
 
 
 
